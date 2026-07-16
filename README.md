@@ -4,7 +4,7 @@
 
 ## 🚀 Deploy เว็บไซต์ของคุณเอง (คลิกเดียว)
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FYOUR_GITHUB_USERNAME%2Fai-demo-web)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fnuisaranth%2Fai-demo-web)
 
 > หลังจาก deploy แล้ว คุณไม่จำเป็นต้องยุ่งกับ GitHub อีกเลย จัดการทุกอย่างได้ที่ `/admin`
 
