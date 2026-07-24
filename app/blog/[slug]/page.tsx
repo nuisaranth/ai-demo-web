@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getPost, onStoreChange, savePost } from "@/lib/store";
-import { renderPostHtml } from "@/lib/markdown";
+import { renderPostHtml, buildMarkdownFile } from "@/lib/markdown";
 import type { BlogPost } from "@/lib/types";
 import SeoInspector from "@/components/SeoInspector";
 import RichTextEditor from "@/components/RichTextEditor";
@@ -70,9 +70,14 @@ export default function BlogArticlePage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
-      <Link href="/blog" className="text-sm text-brand-600 font-semibold hover:underline">
-        ← Back to Blog
-      </Link>
+      <div className="flex items-center justify-between">
+        <Link href="/blog" className="text-sm text-brand-600 font-semibold hover:underline">
+          ← Back to Blog
+        </Link>
+        <Link href="/admin" className="text-sm text-slate-500 font-semibold hover:underline">
+          ⚙️ Admin
+        </Link>
+      </div>
 
       <div className="grid gap-8 lg:grid-cols-[1fr_360px] mt-6 items-start">
         {/* Article */}
@@ -115,6 +120,20 @@ export default function BlogArticlePage() {
                     className="text-xs font-semibold text-brand-600 hover:underline px-2"
                   >
                     ✏️ Edit content
+                  </button>
+                  <button
+                    onClick={() => {
+                      const md = buildMarkdownFile(post, html);
+                      const blob = new Blob([md], { type: "text/markdown" });
+                      const a = document.createElement("a");
+                      a.href = URL.createObjectURL(blob);
+                      a.download = `${post.slug}.md`;
+                      a.click();
+                      URL.revokeObjectURL(a.href);
+                    }}
+                    className="text-xs font-semibold text-slate-600 hover:underline px-2"
+                  >
+                    ⬇️ Save as .md
                   </button>
                   <button
                     onClick={() => setShowHtml(!showHtml)}

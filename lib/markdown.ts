@@ -1,7 +1,16 @@
 import { marked } from "marked";
+import TurndownService from "turndown";
 import type { BlogPost } from "./types";
 
 marked.setOptions({ gfm: true, breaks: true });
+
+const turndown = new TurndownService({ headingStyle: "atx" });
+// Images are managed separately via the Admin/SEO Inspector image picker —
+// export them as the same [IMAGE] placeholder the upload flow recognizes.
+turndown.addRule("imagePlaceholder", {
+  filter: "img",
+  replacement: () => "[IMAGE]",
+});
 
 export function slugify(text: string): string {
   return (
@@ -83,6 +92,22 @@ export function renderPostHtml(post: BlogPost): string {
   }
 
   return marked.parse(md) as string;
+}
+
+/** Build a downloadable .md file (frontmatter + body) from the current rendered content */
+export function buildMarkdownFile(post: BlogPost, html: string): string {
+  const body = turndown.turndown(html);
+  const frontmatter = [
+    "---",
+    `title: ${post.title}`,
+    `description: ${post.description}`,
+    `slug: ${post.slug}`,
+    `schema: ${post.schemaType}`,
+    `schemaname: ${post.schemaName}`,
+    "---",
+    "",
+  ].join("\n");
+  return frontmatter + body;
 }
 
 export function countHeadings(html: string): { h1: number; h2: number; h3: number } {

@@ -68,7 +68,15 @@ export default function AdminPage() {
   const handleMdUpload = (file: File) => {
     const reader = new FileReader();
     reader.onload = () => {
-      const post = parseMarkdownFile(file.name, String(reader.result));
+      const parsed = parseMarkdownFile(file.name, String(reader.result));
+      // Re-uploading (same slug or filename) keeps the previously chosen image —
+      // .md files don't carry image data, so wiping it on every re-upload was surprising.
+      const existing = getPosts().find(
+        (p) => p.slug === parsed.slug || p.fileName === parsed.fileName
+      );
+      const post = existing
+        ? { ...parsed, imageUrl: existing.imageUrl, imageAlt: existing.imageAlt }
+        : parsed;
       savePost(post);
       setEditing(post);
       notify(`✅ "${file.name}" uploaded & parsed!`);
