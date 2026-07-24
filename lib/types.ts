@@ -6,6 +6,7 @@ export interface BlogPost {
   schemaType: string;   // e.g. "Article", "Course"
   schemaName: string;   // Schema "name" property
   markdown: string;     // raw markdown body
+  bodyHtml?: string;    // rich-text edited HTML — takes over from markdown once set
   imageUrl: string;     // data URL or mock image path
   imageAlt: string;
   createdAt: number;

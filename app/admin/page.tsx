@@ -11,7 +11,7 @@ import {
   deleteAllPosts,
   onStoreChange,
 } from "@/lib/store";
-import { parseMarkdownFile } from "@/lib/markdown";
+import { parseMarkdownFile, slugify } from "@/lib/markdown";
 import type { BlogPost } from "@/lib/types";
 
 const MOCK_IMAGES = [
@@ -232,6 +232,20 @@ export default function AdminPage() {
                   <input
                     value={editing.title}
                     onChange={(e) => setEditing({ ...editing, title: e.target.value })}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    URL Slug{" "}
+                    <span className="text-slate-400 font-normal">(/blog/…)</span>
+                  </label>
+                  <input
+                    value={editing.slug}
+                    onChange={(e) => setEditing({ ...editing, slug: e.target.value })}
+                    onBlur={(e) =>
+                      setEditing({ ...editing, slug: slugify(e.target.value) })
+                    }
                     className={inputCls}
                   />
                 </div>

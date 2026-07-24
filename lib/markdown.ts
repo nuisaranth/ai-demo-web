@@ -65,6 +65,8 @@ export function parseMarkdownFile(fileName: string, raw: string): BlogPost {
 
 /** Render markdown to HTML, replacing image placeholders with the chosen image */
 export function renderPostHtml(post: BlogPost): string {
+  if (post.bodyHtml) return post.bodyHtml;
+
   let md = post.markdown;
 
   if (post.imageUrl) {
