@@ -14,8 +14,7 @@ export default function BlogArticlePage() {
   const slug = decodeURIComponent(params.slug);
 
   const [post, setPost] = useState<BlogPost | null | undefined>(undefined);
-  const [showHtml, setShowHtml] = useState(false);
-  const [editingBody, setEditingBody] = useState(false);
+  const [editing, setEditing] = useState(false);
   const draftHtml = useRef("");
 
   useEffect(() => {
@@ -84,17 +83,13 @@ export default function BlogArticlePage() {
         <article className="rounded-2xl border border-slate-200 overflow-hidden">
           <div className="flex items-center justify-between px-6 py-3 bg-slate-50 border-b border-slate-200">
             <p className="text-xs text-slate-500">
-              {editingBody
-                ? "Editing content"
-                : showHtml
-                ? "Raw HTML — what Google bots read"
-                : "Visual article view"}
+              {editing ? "Editing content — toggle </> for raw HTML" : "Visual article view"}
             </p>
             <div className="flex items-center gap-2">
-              {editingBody ? (
+              {editing ? (
                 <>
                   <button
-                    onClick={() => setEditingBody(false)}
+                    onClick={() => setEditing(false)}
                     className="text-xs font-semibold text-slate-500 hover:underline px-2"
                   >
                     Cancel
@@ -103,7 +98,7 @@ export default function BlogArticlePage() {
                     onClick={() => {
                       if (!post) return;
                       savePost({ ...post, bodyHtml: draftHtml.current, updatedAt: Date.now() });
-                      setEditingBody(false);
+                      setEditing(false);
                     }}
                     className="text-xs font-semibold text-white bg-brand-600 px-3 py-1.5 rounded-lg hover:bg-brand-700"
                   >
@@ -115,7 +110,7 @@ export default function BlogArticlePage() {
                   <button
                     onClick={() => {
                       draftHtml.current = html;
-                      setEditingBody(true);
+                      setEditing(true);
                     }}
                     className="text-xs font-semibold text-brand-600 hover:underline px-2"
                   >
@@ -135,38 +130,26 @@ export default function BlogArticlePage() {
                   >
                     ⬇️ Save as .md
                   </button>
-                  <button
-                    onClick={() => setShowHtml(!showHtml)}
-                    className={`text-xs font-mono font-bold px-3 py-1.5 rounded-lg border transition-colors ${
-                      showHtml
-                        ? "bg-slate-900 text-emerald-400 border-slate-900"
-                        : "bg-white text-slate-600 border-slate-300 hover:bg-slate-100"
-                    }`}
-                    title="Toggle raw HTML view"
-                  >
-                    &lt;/&gt;
-                  </button>
                 </>
               )}
             </div>
           </div>
 
-          {editingBody ? (
+          {editing ? (
             <RichTextEditor
               initialHtml={html}
               onChange={(h) => {
                 draftHtml.current = h;
               }}
+              onSave={(h) => {
+                draftHtml.current = h;
+                if (!post) return;
+                savePost({ ...post, bodyHtml: h, updatedAt: Date.now() });
+              }}
             />
           ) : (
             <div className="p-6 md:p-8">
-              {showHtml ? (
-                <pre className="bg-slate-900 text-emerald-300 text-xs p-5 rounded-xl overflow-x-auto whitespace-pre-wrap leading-relaxed">
-                  {html}
-                </pre>
-              ) : (
-                <div className="article-body" dangerouslySetInnerHTML={{ __html: html }} />
-              )}
+              <div className="article-body" dangerouslySetInnerHTML={{ __html: html }} />
             </div>
           )}
         </article>

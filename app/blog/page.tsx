@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getPosts, onStoreChange } from "@/lib/store";
+import { getPostThumbnail } from "@/lib/markdown";
 import type { BlogPost } from "@/lib/types";
 
 export default function BlogPage() {
@@ -44,30 +45,33 @@ export default function BlogPage() {
       )}
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {posts.map((p) => (
-          <Link
-            key={p.slug}
-            href={`/blog/${encodeURIComponent(p.slug)}`}
-            className="rounded-2xl border border-slate-200 overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all flex flex-col"
-          >
-            {p.imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={p.imageUrl} alt={p.imageAlt || p.title} className="h-44 w-full object-cover" />
-            ) : (
-              <div className="h-44 bg-gradient-to-br from-brand-100 to-brand-50 grid place-items-center text-5xl">
-                📰
+        {posts.map((p) => {
+          const thumb = getPostThumbnail(p);
+          return (
+            <Link
+              key={p.slug}
+              href={`/blog/${encodeURIComponent(p.slug)}`}
+              className="rounded-2xl border border-slate-200 overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all flex flex-col"
+            >
+              {thumb ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={thumb.src} alt={thumb.alt} className="h-44 w-full object-cover" />
+              ) : (
+                <div className="h-44 bg-gradient-to-br from-brand-100 to-brand-50 grid place-items-center text-5xl">
+                  📰
+                </div>
+              )}
+              <div className="p-6 flex flex-col flex-1">
+                <span className="text-xs font-semibold text-brand-600 mb-2">{p.schemaType}</span>
+                <h2 className="font-bold text-slate-900 mb-2 line-clamp-2">{p.title}</h2>
+                <p className="text-sm text-slate-500 line-clamp-3 mb-4">{p.description}</p>
+                <p className="text-xs text-slate-400 mt-auto">
+                  {new Date(p.updatedAt).toLocaleDateString()}
+                </p>
               </div>
-            )}
-            <div className="p-6 flex flex-col flex-1">
-              <span className="text-xs font-semibold text-brand-600 mb-2">{p.schemaType}</span>
-              <h2 className="font-bold text-slate-900 mb-2 line-clamp-2">{p.title}</h2>
-              <p className="text-sm text-slate-500 line-clamp-3 mb-4">{p.description}</p>
-              <p className="text-xs text-slate-400 mt-auto">
-                {new Date(p.updatedAt).toLocaleDateString()}
-              </p>
-            </div>
-          </Link>
-        ))}
+            </Link>
+          );
+        })}
       </div>
     </div>
   );

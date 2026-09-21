@@ -115,3 +115,12 @@ export function countHeadings(html: string): { h1: number; h2: number; h3: numbe
     (html.match(new RegExp(`<${tag}[\\s>]`, "gi")) || []).length;
   return { h1: count("h1"), h2: count("h2"), h3: count("h3") };
 }
+
+/** Thumbnail for cards: the set featured image, falling back to the first <img> in the article body */
+export function getPostThumbnail(post: BlogPost): { src: string; alt: string } | null {
+  if (post.imageUrl) return { src: post.imageUrl, alt: post.imageAlt || post.title };
+  const match = renderPostHtml(post).match(/<img[^>]*\ssrc="([^"]+)"[^>]*>/i);
+  if (!match) return null;
+  const altMatch = match[0].match(/\salt="([^"]*)"/i);
+  return { src: match[1], alt: altMatch?.[1] || post.title };
+}

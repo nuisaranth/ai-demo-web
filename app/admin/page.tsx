@@ -43,6 +43,7 @@ export default function AdminPage() {
   const [gaId, setGaId] = useState("");
   const [gaSaved, setGaSaved] = useState(false);
   const [editing, setEditing] = useState<BlogPost | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState("");
   const [toast, setToast] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const imgRef = useRef<HTMLInputElement>(null);
@@ -86,8 +87,23 @@ export default function AdminPage() {
 
   const handleImageUpload = (file: File) => {
     if (!editing) return;
+    setUploadedFileName(file.name);
     const reader = new FileReader();
-    reader.onload = () => setEditing({ ...editing, imageUrl: String(reader.result) });
+    reader.onload = () => {
+      const suggestedAlt = file.name
+        .replace(/\.[^.]+$/, "")
+        .replace(/[-_]+/g, " ")
+        .trim();
+      setEditing((prev) =>
+        prev
+          ? {
+              ...prev,
+              imageUrl: String(reader.result),
+              imageAlt: prev.imageAlt || suggestedAlt,
+            }
+          : prev
+      );
+    };
     reader.readAsDataURL(file);
   };
 
@@ -341,6 +357,12 @@ export default function AdminPage() {
                       </button>
                     )}
                   </div>
+                  {uploadedFileName && (
+                    <p className="text-xs text-slate-400 mt-2">
+                      Uploaded: {uploadedFileName} — tip: name image files with real keywords
+                      (e.g. &quot;power-bi-dashboard.jpg&quot;), not &quot;IMG_1234.jpg&quot;
+                    </p>
+                  )}
                   {editing.imageUrl && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
