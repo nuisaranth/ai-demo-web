@@ -7,6 +7,8 @@
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fnuisaranth%2Fai-demo-web)
 
 > หลังจาก deploy แล้ว คุณไม่จำเป็นต้องยุ่งกับ GitHub อีกเลย จัดการทุกอย่างได้ที่ `/admin`
+>
+> 🔒 **เว็บนี้ตั้งค่าห้าม Google index ไว้เป็นค่าเริ่มต้น** (`noindex` + `robots.txt` disallow ทั้งเว็บ) เพราะเป็นเว็บ demo สำหรับฝึกในคลาส ไม่ใช่เว็บบริษัทจริง — ทุกเว็บที่ deploy จาก repo นี้ (ของนักเรียนทุกคน) จะได้ค่านี้ติดไปด้วยอัตโนมัติ ถ้าใครต้องการเอาไปใช้เป็นเว็บจริงและอยากให้ Google index ได้ ต้องแก้โค้ด 2 จุด: ลบ `robots: { index: false, follow: false }` ออกจาก `app/layout.tsx` และลบ/แก้ `app/robots.ts`
 
 ## 🧭 วิธีใช้งาน (สำหรับนักเรียน)
 

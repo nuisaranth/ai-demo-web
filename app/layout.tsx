@@ -8,6 +8,10 @@ export const metadata: Metadata = {
   title: "BrightWave Digital — AI & Digital Marketing Demo",
   description:
     "Demo company website for the AI & Digital Marketing class. Manage everything from the visual Admin panel.",
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 export default function RootLayout({
