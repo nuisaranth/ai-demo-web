@@ -21,6 +21,37 @@ const MOCK_IMAGES = [
   { label: "Coffee ☕", url: "https://picsum.photos/seed/coffee/800/450" },
 ];
 
+const MAX_IMAGE_DIMENSION = 1200;
+const WEBP_QUALITY = 0.8;
+
+// AI-generated images often come back huge (2-4K px, several MB), which bloats
+// localStorage fast since images are stored as base64 data URLs. Downscaling
+// and re-encoding as WebP client-side keeps the mock "database" small.
+function resizeImageToWebp(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error);
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onerror = () => reject(new Error("Invalid image"));
+      img.onload = () => {
+        const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(img.width, img.height));
+        const width = Math.round(img.width * scale);
+        const height = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return reject(new Error("Canvas not supported"));
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/webp", WEBP_QUALITY));
+      };
+      img.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 const inputCls =
   "w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500";
 
@@ -38,7 +69,29 @@ function Card({ title, step, children }: { title: string; step: string; children
   );
 }
 
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
+        active ? "bg-brand-600 text-white" : "text-slate-600 hover:bg-slate-100"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
 export default function AdminPage() {
+  const [tab, setTab] = useState<"posts" | "settings">("posts");
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [gaId, setGaId] = useState("");
   const [gaSaved, setGaSaved] = useState(false);
@@ -78,329 +131,352 @@ export default function AdminPage() {
       const post = existing
         ? { ...parsed, imageUrl: existing.imageUrl, imageAlt: existing.imageAlt }
         : parsed;
-      savePost(post);
-      setEditing(post);
-      notify(`✅ "${file.name}" uploaded & parsed!`);
+      try {
+        savePost(post);
+        setEditing(post);
+        notify(`✅ "${file.name}" uploaded & parsed!`);
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Couldn't save the article.");
+      }
     };
     reader.readAsText(file);
   };
 
-  const handleImageUpload = (file: File) => {
+  const handleImageUpload = async (file: File) => {
     if (!editing) return;
     setUploadedFileName(file.name);
-    const reader = new FileReader();
-    reader.onload = () => {
-      const suggestedAlt = file.name
-        .replace(/\.[^.]+$/, "")
-        .replace(/[-_]+/g, " ")
-        .trim();
+    const suggestedAlt = file.name
+      .replace(/\.[^.]+$/, "")
+      .replace(/[-_]+/g, " ")
+      .trim();
+    try {
+      const dataUrl = await resizeImageToWebp(file);
       setEditing((prev) =>
         prev
           ? {
               ...prev,
-              imageUrl: String(reader.result),
+              imageUrl: dataUrl,
               imageAlt: prev.imageAlt || suggestedAlt,
             }
           : prev
       );
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      alert("Couldn't process that image. Please try a different file.");
+    }
   };
 
   const saveEditing = () => {
     if (!editing) return;
-    savePost({ ...editing, updatedAt: Date.now() });
-    notify("✅ Article saved!");
+    try {
+      savePost({ ...editing, updatedAt: Date.now() });
+      notify("✅ Article saved!");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Couldn't save the article.");
+    }
   };
 
   return (
     <div className="bg-slate-50 min-h-screen">
       <div className="mx-auto max-w-4xl px-4 py-12">
-        <div className="mb-10">
+        <div className="mb-6">
           <h1 className="text-3xl font-bold text-slate-900 mb-2">⚙️ Admin Panel</h1>
           <p className="text-slate-500 text-sm">
             Manage tracking and blog content — everything is saved in this browser automatically.
           </p>
         </div>
 
+        <div className="flex gap-1 bg-white border border-slate-200 rounded-2xl p-1.5 mb-6 w-fit">
+          <TabButton active={tab === "posts"} onClick={() => setTab("posts")}>
+            📝 Blog Posts
+          </TabButton>
+          <TabButton active={tab === "settings"} onClick={() => setTab("settings")}>
+            ⚙️ Site Settings
+          </TabButton>
+        </div>
+
         <div className="space-y-6">
-          {/* 1. GA4 */}
-          <Card step="1" title="Google Analytics 4 Tracking">
-            <p className="text-sm text-slate-500 mb-3">
-              Paste your GA4 Measurement ID and save. Then open Google Analytics → Realtime to
-              watch your own visits appear live.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <input
-                value={gaId}
-                onChange={(e) => setGaId(e.target.value)}
-                placeholder="G-XXXXXXXXXX"
-                className={`${inputCls} font-mono flex-1`}
-              />
-              <button
-                onClick={saveGa}
-                className="bg-brand-600 text-white text-sm font-semibold px-6 py-2.5 rounded-xl hover:bg-brand-700 shrink-0"
-              >
-                {gaSaved ? "✓ Saved!" : "Save ID"}
-              </button>
-            </div>
-            {gaId && !/^G-[A-Z0-9]{4,}$/i.test(gaId.trim()) && (
-              <p className="text-xs text-red-600 mt-2">
-                ⚠️ ID should look like <span className="font-mono">G-XXXXXXXXXX</span>
+          {tab === "settings" && (
+            <Card step="1" title="Google Analytics 4 Tracking">
+              <p className="text-sm text-slate-500 mb-3">
+                Paste your GA4 Measurement ID and save. Then open Google Analytics → Realtime to
+                watch your own visits appear live.
               </p>
-            )}
-          </Card>
-
-          {/* 2. Markdown upload */}
-          <Card step="2" title="Upload Blog Article (.md)">
-            <p className="text-sm text-slate-500 mb-4">
-              Browse a Markdown file generated by AI (Gemini / Claude). Re-uploading a file with
-              the same name completely replaces the old version.
-            </p>
-            <div
-              className="rounded-2xl border-2 border-dashed border-brand-300 bg-brand-50/50 p-8 text-center cursor-pointer hover:bg-brand-50 transition-colors"
-              onClick={() => fileRef.current?.click()}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault();
-                const f = e.dataTransfer.files[0];
-                if (f?.name.toLowerCase().endsWith(".md")) handleMdUpload(f);
-              }}
-            >
-              <div className="text-4xl mb-2">📄</div>
-              <p className="font-semibold text-slate-800 text-sm">Click to browse or drop a .md file here</p>
-              <p className="text-xs text-slate-400 mt-1">The article is parsed and published instantly</p>
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".md,text/markdown"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) handleMdUpload(f);
-                  e.target.value = "";
-                }}
-              />
-            </div>
-
-            {/* Post list */}
-            {posts.length > 0 && (
-              <div className="mt-6 space-y-2">
-                {posts.map((p) => (
-                  <div
-                    key={p.slug}
-                    className={`flex items-center gap-3 rounded-xl border p-3 ${
-                      editing?.slug === p.slug ? "border-brand-500 bg-brand-50/50" : "border-slate-200"
-                    }`}
-                  >
-                    <span className="text-xl">📰</span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-slate-800 truncate">{p.title}</p>
-                      <p className="text-xs text-slate-400 truncate">{p.fileName}</p>
-                    </div>
-                    <button
-                      onClick={() => setEditing(p)}
-                      className="text-xs font-semibold text-brand-600 hover:underline shrink-0"
-                    >
-                      Edit
-                    </button>
-                    <Link
-                      href={`/blog/${encodeURIComponent(p.slug)}`}
-                      className="text-xs font-semibold text-slate-500 hover:underline shrink-0"
-                    >
-                      View
-                    </Link>
-                    <button
-                      onClick={() => {
-                        deletePost(p.slug);
-                        if (editing?.slug === p.slug) setEditing(null);
-                        notify("🗑️ Article deleted");
-                      }}
-                      className="text-xs font-semibold text-red-500 hover:underline shrink-0"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                ))}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <input
+                  value={gaId}
+                  onChange={(e) => setGaId(e.target.value)}
+                  placeholder="G-XXXXXXXXXX"
+                  className={`${inputCls} font-mono flex-1`}
+                />
                 <button
-                  onClick={() => {
-                    if (confirm("Delete ALL articles? This cannot be undone.")) {
-                      deleteAllPosts();
-                      setEditing(null);
-                      notify("🗑️ All articles deleted");
-                    }
-                  }}
-                  className="w-full mt-2 border border-red-300 text-red-600 text-sm font-semibold py-2.5 rounded-xl hover:bg-red-50"
+                  onClick={saveGa}
+                  className="bg-brand-600 text-white text-sm font-semibold px-6 py-2.5 rounded-xl hover:bg-brand-700 shrink-0"
                 >
-                  🗑️ Delete / Reset All Articles
+                  {gaSaved ? "✓ Saved!" : "Save ID"}
                 </button>
               </div>
-            )}
-          </Card>
+              {gaId && !/^G-[A-Z0-9]{4,}$/i.test(gaId.trim()) && (
+                <p className="text-xs text-red-600 mt-2">
+                  ⚠️ ID should look like <span className="font-mono">G-XXXXXXXXXX</span>
+                </p>
+              )}
+            </Card>
+          )}
 
-          {/* 3. Hybrid editor */}
-          <Card step="3" title="SEO Editor & Image">
-            {!editing ? (
-              <p className="text-sm text-slate-400 text-center py-8">
-                Upload or select an article above to edit its SEO settings ☝️
-              </p>
-            ) : (
-              <div className="space-y-5">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                    Title Tag{" "}
-                    <span className={editing.title.length > 60 ? "text-red-600" : "text-emerald-600"}>
-                      ({editing.title.length}/60)
-                    </span>
-                  </label>
+          {tab === "posts" && (
+            <>
+              {/* 1. Markdown upload */}
+              <Card step="1" title="Upload Blog Article (.md)">
+                <p className="text-sm text-slate-500 mb-4">
+                  Browse a Markdown file generated by AI (Gemini / Claude). Re-uploading a file with
+                  the same name completely replaces the old version.
+                </p>
+                <div
+                  className="rounded-2xl border-2 border-dashed border-brand-300 bg-brand-50/50 p-8 text-center cursor-pointer hover:bg-brand-50 transition-colors"
+                  onClick={() => fileRef.current?.click()}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const f = e.dataTransfer.files[0];
+                    if (f?.name.toLowerCase().endsWith(".md")) handleMdUpload(f);
+                  }}
+                >
+                  <div className="text-4xl mb-2">📄</div>
+                  <p className="font-semibold text-slate-800 text-sm">Click to browse or drop a .md file here</p>
+                  <p className="text-xs text-slate-400 mt-1">The article is parsed and published instantly</p>
                   <input
-                    value={editing.title}
-                    onChange={(e) => setEditing({ ...editing, title: e.target.value })}
-                    className={inputCls}
+                    ref={fileRef}
+                    type="file"
+                    accept=".md,text/markdown"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleMdUpload(f);
+                      e.target.value = "";
+                    }}
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                    URL Slug{" "}
-                    <span className="text-slate-400 font-normal">(/blog/…)</span>
-                  </label>
-                  <input
-                    value={editing.slug}
-                    onChange={(e) => setEditing({ ...editing, slug: e.target.value })}
-                    onBlur={(e) =>
-                      setEditing({ ...editing, slug: slugify(e.target.value) })
-                    }
-                    className={inputCls}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                    Meta Description{" "}
-                    <span
-                      className={editing.description.length > 150 ? "text-red-600" : "text-emerald-600"}
-                    >
-                      ({editing.description.length}/150)
-                    </span>
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={editing.description}
-                    onChange={(e) => setEditing({ ...editing, description: e.target.value })}
-                    className={inputCls}
-                  />
-                </div>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Schema Type</label>
-                    <select
-                      value={editing.schemaType}
-                      onChange={(e) => setEditing({ ...editing, schemaType: e.target.value })}
-                      className={inputCls}
-                    >
-                      {["Article", "BlogPosting", "Course", "Product", "FAQPage", "HowTo"].map((t) => (
-                        <option key={t}>{t}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Schema Name</label>
-                    <input
-                      value={editing.schemaName}
-                      onChange={(e) => setEditing({ ...editing, schemaName: e.target.value })}
-                      className={inputCls}
-                    />
-                  </div>
                 </div>
 
-                {/* Image management */}
-                <div className="rounded-xl border border-slate-200 p-4">
-                  <p className="text-sm font-medium text-slate-700 mb-3">Article Image</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
-                    {MOCK_IMAGES.map((m) => (
-                      <button
-                        key={m.url}
-                        onClick={() => setEditing({ ...editing, imageUrl: m.url })}
-                        className={`rounded-xl border-2 p-2 text-xs font-medium transition-colors ${
-                          editing.imageUrl === m.url
-                            ? "border-brand-500 bg-brand-50"
-                            : "border-slate-200 hover:border-slate-300"
+                {/* Post list */}
+                {posts.length > 0 && (
+                  <div className="mt-6 space-y-2">
+                    {posts.map((p) => (
+                      <div
+                        key={p.slug}
+                        className={`flex items-center gap-3 rounded-xl border p-3 ${
+                          editing?.slug === p.slug ? "border-brand-500 bg-brand-50/50" : "border-slate-200"
                         }`}
                       >
-                        {m.label}
-                      </button>
+                        <span className="text-xl">📰</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-slate-800 truncate">{p.title}</p>
+                          <p className="text-xs text-slate-400 truncate">{p.fileName}</p>
+                        </div>
+                        <button
+                          onClick={() => setEditing(p)}
+                          className="text-xs font-semibold text-brand-600 hover:underline shrink-0"
+                        >
+                          Edit
+                        </button>
+                        <Link
+                          href={`/blog/${encodeURIComponent(p.slug)}`}
+                          className="text-xs font-semibold text-slate-500 hover:underline shrink-0"
+                        >
+                          View
+                        </Link>
+                        <button
+                          onClick={() => {
+                            deletePost(p.slug);
+                            if (editing?.slug === p.slug) setEditing(null);
+                            notify("🗑️ Article deleted");
+                          }}
+                          className="text-xs font-semibold text-red-500 hover:underline shrink-0"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     ))}
-                  </div>
-                  <div className="flex flex-col sm:flex-row gap-3">
                     <button
-                      onClick={() => imgRef.current?.click()}
-                      className="border border-slate-300 text-slate-700 text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-slate-50"
-                    >
-                      📁 Upload local image…
-                    </button>
-                    <input
-                      ref={imgRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) handleImageUpload(f);
-                        e.target.value = "";
+                      onClick={() => {
+                        if (confirm("Delete ALL articles? This cannot be undone.")) {
+                          deleteAllPosts();
+                          setEditing(null);
+                          notify("🗑️ All articles deleted");
+                        }
                       }}
-                    />
-                    {editing.imageUrl && (
-                      <button
-                        onClick={() => setEditing({ ...editing, imageUrl: "" })}
-                        className="text-sm text-red-500 font-semibold hover:underline"
-                      >
-                        Remove image
-                      </button>
-                    )}
+                      className="w-full mt-2 border border-red-300 text-red-600 text-sm font-semibold py-2.5 rounded-xl hover:bg-red-50"
+                    >
+                      🗑️ Delete / Reset All Articles
+                    </button>
                   </div>
-                  {uploadedFileName && (
-                    <p className="text-xs text-slate-400 mt-2">
-                      Uploaded: {uploadedFileName} — tip: name image files with real keywords
-                      (e.g. &quot;power-bi-dashboard.jpg&quot;), not &quot;IMG_1234.jpg&quot;
-                    </p>
-                  )}
-                  {editing.imageUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={editing.imageUrl}
-                      alt={editing.imageAlt || "preview"}
-                      className="mt-3 rounded-xl max-h-48 object-cover w-full"
-                    />
-                  )}
-                  <div className="mt-3">
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                      Alt Text (describe the image for Google & screen readers)
-                    </label>
-                    <input
-                      value={editing.imageAlt}
-                      onChange={(e) => setEditing({ ...editing, imageAlt: e.target.value })}
-                      placeholder="e.g. Marketer analysing a GA4 dashboard"
-                      className={inputCls}
-                    />
-                  </div>
-                </div>
+                )}
+              </Card>
 
-                <div className="flex gap-3">
-                  <button
-                    onClick={saveEditing}
-                    className="flex-1 bg-brand-600 text-white font-semibold py-3 rounded-xl hover:bg-brand-700"
-                  >
-                    💾 Save Article
-                  </button>
-                  <Link
-                    href={`/blog/${encodeURIComponent(editing.slug)}`}
-                    className="border border-slate-300 text-slate-700 font-semibold px-6 py-3 rounded-xl hover:bg-slate-50"
-                  >
-                    Preview →
-                  </Link>
-                </div>
-              </div>
-            )}
-          </Card>
+              {/* 2. Hybrid editor */}
+              <Card step="2" title="SEO Editor & Image">
+                {!editing ? (
+                  <p className="text-sm text-slate-400 text-center py-8">
+                    Upload or select an article above to edit its SEO settings ☝️
+                  </p>
+                ) : (
+                  <div className="space-y-5">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                        Title Tag{" "}
+                        <span className={editing.title.length > 60 ? "text-red-600" : "text-emerald-600"}>
+                          ({editing.title.length}/60)
+                        </span>
+                      </label>
+                      <input
+                        value={editing.title}
+                        onChange={(e) => setEditing({ ...editing, title: e.target.value })}
+                        className={inputCls}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                        URL Slug{" "}
+                        <span className="text-slate-400 font-normal">(/blog/…)</span>
+                      </label>
+                      <input
+                        value={editing.slug}
+                        onChange={(e) => setEditing({ ...editing, slug: e.target.value })}
+                        onBlur={(e) =>
+                          setEditing({ ...editing, slug: slugify(e.target.value) })
+                        }
+                        className={inputCls}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                        Meta Description{" "}
+                        <span
+                          className={editing.description.length > 150 ? "text-red-600" : "text-emerald-600"}
+                        >
+                          ({editing.description.length}/150)
+                        </span>
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={editing.description}
+                        onChange={(e) => setEditing({ ...editing, description: e.target.value })}
+                        className={inputCls}
+                      />
+                    </div>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Schema Type</label>
+                        <select
+                          value={editing.schemaType}
+                          onChange={(e) => setEditing({ ...editing, schemaType: e.target.value })}
+                          className={inputCls}
+                        >
+                          {["Article", "BlogPosting", "Course", "Product", "FAQPage", "HowTo"].map((t) => (
+                            <option key={t}>{t}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Schema Name</label>
+                        <input
+                          value={editing.schemaName}
+                          onChange={(e) => setEditing({ ...editing, schemaName: e.target.value })}
+                          className={inputCls}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Image management */}
+                    <div className="rounded-xl border border-slate-200 p-4">
+                      <p className="text-sm font-medium text-slate-700 mb-3">Article Image</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                        {MOCK_IMAGES.map((m) => (
+                          <button
+                            key={m.url}
+                            onClick={() => setEditing({ ...editing, imageUrl: m.url })}
+                            className={`rounded-xl border-2 p-2 text-xs font-medium transition-colors ${
+                              editing.imageUrl === m.url
+                                ? "border-brand-500 bg-brand-50"
+                                : "border-slate-200 hover:border-slate-300"
+                            }`}
+                          >
+                            {m.label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <button
+                          onClick={() => imgRef.current?.click()}
+                          className="border border-slate-300 text-slate-700 text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-slate-50"
+                        >
+                          📁 Upload local image…
+                        </button>
+                        <input
+                          ref={imgRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) handleImageUpload(f);
+                            e.target.value = "";
+                          }}
+                        />
+                        {editing.imageUrl && (
+                          <button
+                            onClick={() => setEditing({ ...editing, imageUrl: "" })}
+                            className="text-sm text-red-500 font-semibold hover:underline"
+                          >
+                            Remove image
+                          </button>
+                        )}
+                      </div>
+                      {uploadedFileName && (
+                        <p className="text-xs text-slate-400 mt-2">
+                          Uploaded: {uploadedFileName} — tip: name image files with real keywords
+                          (e.g. &quot;power-bi-dashboard.jpg&quot;), not &quot;IMG_1234.jpg&quot;
+                        </p>
+                      )}
+                      {editing.imageUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={editing.imageUrl}
+                          alt={editing.imageAlt || "preview"}
+                          className="mt-3 rounded-xl max-h-48 object-cover w-full"
+                        />
+                      )}
+                      <div className="mt-3">
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                          Alt Text (describe the image for Google & screen readers)
+                        </label>
+                        <input
+                          value={editing.imageAlt}
+                          onChange={(e) => setEditing({ ...editing, imageAlt: e.target.value })}
+                          placeholder="e.g. Marketer analysing a GA4 dashboard"
+                          className={inputCls}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <button
+                        onClick={saveEditing}
+                        className="flex-1 bg-brand-600 text-white font-semibold py-3 rounded-xl hover:bg-brand-700"
+                      >
+                        💾 Save Article
+                      </button>
+                      <Link
+                        href={`/blog/${encodeURIComponent(editing.slug)}`}
+                        className="border border-slate-300 text-slate-700 font-semibold px-6 py-3 rounded-xl hover:bg-slate-50"
+                      >
+                        Preview →
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </Card>
+            </>
+          )}
         </div>
       </div>
 

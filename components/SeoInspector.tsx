@@ -50,9 +50,13 @@ export default function SeoInspector({ post, html }: { post: BlogPost; html: str
   const save = () => {
     const newSlug = slugify(draft.slug) || post.slug;
     const updated: BlogPost = { ...draft, slug: newSlug, updatedAt: Date.now() };
-    savePost(updated);
-    setEditMode(false);
-    if (newSlug !== post.slug) router.replace(`/blog/${encodeURIComponent(newSlug)}`);
+    try {
+      savePost(updated);
+      setEditMode(false);
+      if (newSlug !== post.slug) router.replace(`/blog/${encodeURIComponent(newSlug)}`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Couldn't save.");
+    }
   };
 
   const shown = editMode ? draft : post;

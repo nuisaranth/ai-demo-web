@@ -79,7 +79,10 @@ export function renderPostHtml(post: BlogPost): string {
   let md = post.markdown;
 
   if (post.imageUrl) {
-    const imgMd = `![${post.imageAlt || post.title}](${post.imageUrl})`;
+    const alt = post.imageAlt || post.title;
+    // Markdown's optional "title" (shown after the url) becomes the HTML title attribute,
+    // which is what actually triggers a hover tooltip — alt alone shows nothing on hover.
+    const imgMd = `![${alt}](${post.imageUrl} "${alt}")`;
     // Replace common AI-generated placeholders, e.g. [IMAGE], [ภาพประกอบ...], ![...](placeholder)
     const placeholder = /\[(?:IMAGE|รูปภาพ|ภาพประกอบ)[^\]]*\]|!\[[^\]]*\]\((?:placeholder|image-placeholder)[^)]*\)/i;
     if (placeholder.test(md)) {

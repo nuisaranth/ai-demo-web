@@ -67,7 +67,9 @@ export default function RichTextEditor({
   const [html, setHtml] = useState(initialHtml); // always the real HTML (full base64 images)
   const [htmlDraft, setHtmlDraft] = useState(""); // what the HTML textarea displays (images collapsed)
   const [renderKey, setRenderKey] = useState(0);
-  const [imgModal, setImgModal] = useState<{ el: HTMLImageElement; alt: string } | null>(null);
+  const [imgModal, setImgModal] = useState<{ el: HTMLImageElement; alt: string; title: string } | null>(
+    null
+  );
   const imageMapRef = useRef<Record<string, string>>({});
 
   // Long base64 image data makes the HTML textarea unreadable, so swap it for a short
@@ -132,7 +134,11 @@ export default function RichTextEditor({
   const selectImageForEditing = (img: HTMLImageElement) => {
     ref.current?.querySelectorAll("img.rte-img-selected").forEach((el) => el.classList.remove("rte-img-selected"));
     img.classList.add("rte-img-selected");
-    setImgModal({ el: img, alt: img.getAttribute("alt") || "" });
+    setImgModal({
+      el: img,
+      alt: img.getAttribute("alt") || "",
+      title: img.getAttribute("title") || "",
+    });
   };
 
   const insertImageFile = (file: File) => {
@@ -153,7 +159,10 @@ export default function RichTextEditor({
         const inserted = Array.from(ref.current.querySelectorAll("img")).find(
           (img) => img.getAttribute("src") === dataUrl
         );
-        if (inserted) selectImageForEditing(inserted);
+        if (inserted) {
+          inserted.setAttribute("alt", suggestedAlt);
+          selectImageForEditing(inserted);
+        }
         onChange(getCleanHtml());
       }
     };
@@ -168,11 +177,19 @@ export default function RichTextEditor({
   const saveImgModal = () => {
     if (!imgModal) return;
     imgModal.el.setAttribute("alt", imgModal.alt);
+    // title is what actually shows on hover — separate from alt, same as Blogger's
+    // "ข้อความหัวเรื่อง" field in its own image editor.
+    if (imgModal.title) imgModal.el.setAttribute("title", imgModal.title);
+    else imgModal.el.removeAttribute("title");
     imgModal.el.classList.remove("rte-img-selected");
     const clean = getCleanHtml();
     onChange(clean);
-    onSave?.(clean); // persist right away — don't make alt text depend on remembering the outer Save button
-    setImgModal(null);
+    setImgModal(null); // close first — persistence failing below shouldn't look like the click did nothing
+    try {
+      onSave?.(clean); // persist right away — don't make alt text depend on remembering the outer Save button
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Couldn't save the image.");
+    }
   };
 
   return (
@@ -301,6 +318,19 @@ export default function RichTextEditor({
                 autoFocus
                 value={imgModal.alt}
                 onChange={(e) => setImgModal({ ...imgModal, alt: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") saveImgModal();
+                }}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Title text — shown as a tooltip when a visitor hovers the image (optional)
+              </label>
+              <input
+                value={imgModal.title}
+                onChange={(e) => setImgModal({ ...imgModal, title: e.target.value })}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") saveImgModal();
                 }}

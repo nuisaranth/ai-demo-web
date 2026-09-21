@@ -46,7 +46,16 @@ export function savePost(post: BlogPost): void {
     (p) => p.fileName !== post.fileName && p.slug !== post.slug
   );
   posts.push(post);
-  localStorage.setItem(POSTS_KEY, JSON.stringify(posts));
+  try {
+    localStorage.setItem(POSTS_KEY, JSON.stringify(posts));
+  } catch {
+    // Most likely a QuotaExceededError — base64 images add up fast against the
+    // ~5-10MB localStorage limit. Surface something actionable instead of a
+    // silent no-op the student can't explain.
+    throw new Error(
+      "Browser storage is full (localStorage limit reached) — try a smaller image, or remove an old article first."
+    );
+  }
   notifyChange();
 }
 

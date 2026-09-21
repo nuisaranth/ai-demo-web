@@ -97,8 +97,12 @@ export default function BlogArticlePage() {
                   <button
                     onClick={() => {
                       if (!post) return;
-                      savePost({ ...post, bodyHtml: draftHtml.current, updatedAt: Date.now() });
-                      setEditing(false);
+                      try {
+                        savePost({ ...post, bodyHtml: draftHtml.current, updatedAt: Date.now() });
+                        setEditing(false);
+                      } catch (err) {
+                        alert(err instanceof Error ? err.message : "Couldn't save the article.");
+                      }
                     }}
                     className="text-xs font-semibold text-white bg-brand-600 px-3 py-1.5 rounded-lg hover:bg-brand-700"
                   >
@@ -145,7 +149,7 @@ export default function BlogArticlePage() {
                 draftHtml.current = h;
                 if (!post) return;
                 savePost({ ...post, bodyHtml: h, updatedAt: Date.now() });
-              }}
+              }} // errors here are caught by RichTextEditor's saveImgModal, which alerts the user
             />
           ) : (
             <div className="p-6 md:p-8">
