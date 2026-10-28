@@ -72,14 +72,18 @@ export function deleteAllPosts(): void {
 
 // ---------- Settings ----------
 
+const DEFAULT_SETTINGS: SiteSettings = { gaId: "", gtmId: "" };
+
 export function getSettings(): SiteSettings {
-  if (typeof window === "undefined") return { gaId: "" };
-  return safeParse<SiteSettings>(localStorage.getItem(SETTINGS_KEY), {
-    gaId: "",
-  });
+  if (typeof window === "undefined") return DEFAULT_SETTINGS;
+  // Merge with defaults so settings saved before a field existed still load cleanly.
+  return {
+    ...DEFAULT_SETTINGS,
+    ...safeParse<Partial<SiteSettings>>(localStorage.getItem(SETTINGS_KEY), {}),
+  };
 }
 
-export function saveSettings(settings: SiteSettings): void {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+export function saveSettings(settings: Partial<SiteSettings>): void {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...getSettings(), ...settings }));
   notifyChange();
 }

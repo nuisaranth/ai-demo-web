@@ -13,6 +13,7 @@ import {
 } from "@/lib/store";
 import { parseMarkdownFile, slugify } from "@/lib/markdown";
 import type { BlogPost } from "@/lib/types";
+import { GA_ID_PATTERN, GTM_ID_PATTERN } from "@/components/AnalyticsLoader";
 
 const MOCK_IMAGES = [
   { label: "Marketing 📊", url: "https://picsum.photos/seed/marketing/800/450" },
@@ -95,6 +96,8 @@ export default function AdminPage() {
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [gaId, setGaId] = useState("");
   const [gaSaved, setGaSaved] = useState(false);
+  const [gtmId, setGtmId] = useState("");
+  const [gtmSaved, setGtmSaved] = useState(false);
   const [editing, setEditing] = useState<BlogPost | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState("");
   const [toast, setToast] = useState("");
@@ -102,7 +105,9 @@ export default function AdminPage() {
   const imgRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setGaId(getSettings().gaId);
+    const settings = getSettings();
+    setGaId(settings.gaId);
+    setGtmId(settings.gtmId);
     const sync = () => setPosts(getPosts());
     sync();
     return onStoreChange(sync);
@@ -117,6 +122,12 @@ export default function AdminPage() {
     saveSettings({ gaId: gaId.trim() });
     setGaSaved(true);
     setTimeout(() => setGaSaved(false), 2500);
+  };
+
+  const saveGtm = () => {
+    saveSettings({ gtmId: gtmId.trim() });
+    setGtmSaved(true);
+    setTimeout(() => setGtmSaved(false), 2500);
   };
 
   const handleMdUpload = (file: File) => {
@@ -196,6 +207,7 @@ export default function AdminPage() {
 
         <div className="space-y-6">
           {tab === "settings" && (
+            <>
             <Card step="1" title="Google Analytics 4 Tracking">
               <p className="text-sm text-slate-500 mb-3">
                 Paste your GA4 Measurement ID and save. Then open Google Analytics → Realtime to
@@ -215,12 +227,43 @@ export default function AdminPage() {
                   {gaSaved ? "✓ Saved!" : "Save ID"}
                 </button>
               </div>
-              {gaId && !/^G-[A-Z0-9]{4,}$/i.test(gaId.trim()) && (
+              {gaId && !GA_ID_PATTERN.test(gaId.trim()) && (
                 <p className="text-xs text-red-600 mt-2">
                   ⚠️ ID should look like <span className="font-mono">G-XXXXXXXXXX</span>
                 </p>
               )}
             </Card>
+
+            <Card step="2" title="Google Tag Manager">
+              <p className="text-sm text-slate-500 mb-3">
+                Paste your GTM Container ID and save. Then open Tag Manager → Preview to check
+                that your tags fire on this site.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <input
+                  value={gtmId}
+                  onChange={(e) => setGtmId(e.target.value)}
+                  placeholder="GTM-XXXXXXX"
+                  className={`${inputCls} font-mono flex-1`}
+                />
+                <button
+                  onClick={saveGtm}
+                  className="bg-brand-600 text-white text-sm font-semibold px-6 py-2.5 rounded-xl hover:bg-brand-700 shrink-0"
+                >
+                  {gtmSaved ? "✓ Saved!" : "Save ID"}
+                </button>
+              </div>
+              {gtmId && !GTM_ID_PATTERN.test(gtmId.trim()) && (
+                <p className="text-xs text-red-600 mt-2">
+                  ⚠️ ID should look like <span className="font-mono">GTM-XXXXXXX</span>
+                </p>
+              )}
+              <p className="text-xs text-slate-400 mt-2">
+                💡 If GA4 is already set up inside GTM, leave step 1 empty to avoid counting visits
+                twice.
+              </p>
+            </Card>
+            </>
           )}
 
           {tab === "posts" && (

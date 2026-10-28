@@ -15,4 +15,5 @@ export interface BlogPost {
 
 export interface SiteSettings {
   gaId: string;
+  gtmId: string;
 }
